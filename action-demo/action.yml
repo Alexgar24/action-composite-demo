@@ -11,5 +11,5 @@ runs:
         python-version: '3.11'
     
     - name: Run Hello World Script
-      run: python ${{ github.action_path }}/hello.py
+      run: python ${{ github.action_path }}/src/hello.py
       shell: bash
