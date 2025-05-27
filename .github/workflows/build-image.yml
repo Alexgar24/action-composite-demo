@@ -50,6 +50,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           
+      - name: Convert to lowercase
+        id: lowercase
+        run: echo "image=${REGISTRY}/${IMAGE_NAME,,}" >> $GITHUB_OUTPUT
+        
       - name: Test the built image
         run: |
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main --help || true
+          docker run --rm ${{ steps.lowercase.outputs.image }}:main --help || true
