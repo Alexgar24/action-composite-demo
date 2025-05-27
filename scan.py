@@ -62,9 +62,13 @@ def scan_terraform(directory, severity_threshold, exit_code, output_format):
         
     # Add output file if specified
     output_file = os.environ.get("INPUT_OUTPUT-FILE", "")
+    output_file_path = None
+    
     if output_file:
-        cmd.extend(["-o", output_file])
-        print(f"💾 Results will be saved to: {output_file}")
+        # Make it absolute path to ensure we can find it later
+        output_file_path = Path(output_file).absolute()
+        cmd.extend(["-o", str(output_file_path)])
+        print(f"💾 Results will be saved to: {output_file_path}")
     
     print("\n" + "=" * 60)
     print("🚀 Starting Trivy scan...")
@@ -91,13 +95,13 @@ def scan_terraform(directory, severity_threshold, exit_code, output_format):
             set_output("issues-found", "true")
     
     # If output file was created, set its path
-    if output_file and Path(output_file).exists():
-        set_output("results-file", output_file)
+    if output_file_path and output_file_path.exists():
+        set_output("results-file", str(output_file_path))
     
     print("=" * 60)
 
-    # Write to summary
-    write_summary(scan_path, severity_threshold, result.returncode != 0, output_format)
+    # Write to summary (pass the actual file path)
+    write_summary(scan_path, severity_threshold, result.returncode != 0, output_format, output_file_path)
     
     return result.returncode
 
@@ -111,7 +115,7 @@ def set_output(name, value):
         # Fallback for local testing
         print(f"::set-output name={name}::{value}")
 
-def write_summary(scan_path, severity_threshold, issues_found, output_format):
+def write_summary(scan_path, severity_threshold, issues_found, output_format, output_file_path):
     """Write scan results to GitHub Actions summary."""
     summary_file = os.environ.get('GITHUB_STEP_SUMMARY')
     if not summary_file:
@@ -130,10 +134,9 @@ def write_summary(scan_path, severity_threshold, issues_found, output_format):
             f.write("```\n\n")
             
             # If we have a results file, try to parse and display it
-            output_file = os.environ.get("INPUT_OUTPUT-FILE", "")
-            if output_file and Path(output_file).exists() and output_format == "json":
+            if output_file_path and output_file_path.exists() and output_format == "json":
                 try:
-                    with open(output_file, 'r') as rf:
+                    with open(output_file_path, 'r') as rf:
                         results = json.load(rf)
                         
                     f.write("### Top Security Issues:\n\n")
@@ -150,7 +153,11 @@ def write_summary(scan_path, severity_threshold, issues_found, output_format):
                             type_ = misconfig.get('Type', 'N/A')
                             resource = misconfig.get('CauseMetadata', {}).get('Resource', 'N/A')
                             
-                            f.write(f"| {severity} | {type_} | {title[:50]}... | `{resource}` |\n")
+                            # Truncate long titles
+                            if len(title) > 50:
+                                title = title[:47] + "..."
+                            
+                            f.write(f"| {severity} | {type_} | {title} | `{resource}` |\n")
                             issue_count += 1
                     
                     if issue_count >= 10:
@@ -158,6 +165,7 @@ def write_summary(scan_path, severity_threshold, issues_found, output_format):
                         
                 except Exception as e:
                     f.write(f"\n*Could not parse detailed results: {e}*\n")
+                    f.write(f"*Output file path: {output_file_path}*\n")
         else:
             f.write("### ✅ No Security Issues Found!\n\n")
             f.write("All Terraform configurations passed the security scan.\n")

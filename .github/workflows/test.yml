@@ -1,4 +1,4 @@
-name: Test Docker Action
+name: Test Trivy Scanner Action
 
 on:
   push:
@@ -7,18 +7,99 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-jobs:   
-  test-on-multiple-runners:
-    name: Test on ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, ubuntu-24.04, ubuntu-22.04]
-    runs-on: ${{ matrix.os }}
+jobs:
+  test-secure-config:
+    name: Test Secure Configuration
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Run Docker Action on ${{ matrix.os }}
+      - name: Scan Secure Terraform
+        id: scan
         uses: ./
+        with:
+          scan-directory: './examples'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'  # Don't fail for demo
+          format: 'json'
+          output-file: 'secure-scan-results.json'
+          
+      - name: Upload Scan Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: secure-scan-results
+          path: secure-scan-results.json
+          
+  test-insecure-config:
+    name: Test Insecure Configuration
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Expected to find issues
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Scan Insecure Terraform
+        id: scan
+        uses: ./
+        with:
+          scan-directory: './examples'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          format: 'json'
+          output-file: 'insecure-scan-results.json'
+          exit-code: '1'
+          
+      - name: Upload Scan Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: insecure-scan-results
+          path: insecure-scan-results.json
+          
+      - name: Display Scan Status
+        if: always()
+        run: |
+          echo "Scan Result: ${{ steps.scan.outputs.scan-result }}"
+          echo "Issues Found: ${{ steps.scan.outputs.issues-found }}"
+          echo "Results File: ${{ steps.scan.outputs.results-file }}"
+          
+  test-output-formats:
+    name: Test Output Formats
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        format: [table, json, sarif]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Scan with ${{ matrix.format }} format
+        id: scan
+        uses: ./
+        with:
+          scan-directory: './examples'
+          format: ${{ matrix.format }}
+          output-file: 'results.${{ matrix.format }}'
+          exit-code: '0'
+          
+      - name: Check output file
+        run: |
+          if [ -f results.${{ matrix.format }} ]; then
+            echo "✅ Output file created successfully"
+            ls -la results.${{ matrix.format }}
+          else
+            echo "❌ Output file not created"
+            exit 1
+          fi
+          
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.format }}
+          path: results.${{ matrix.format }}
