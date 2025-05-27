@@ -11,6 +11,7 @@ jobs:
   test-on-multiple-runners:
     name: Test on ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04, ubuntu-22.04]
     runs-on: ${{ matrix.os }}

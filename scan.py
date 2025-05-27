@@ -95,6 +95,9 @@ def scan_terraform(directory, severity_threshold, exit_code, output_format):
         set_output("results-file", output_file)
     
     print("=" * 60)
+
+    # Write to summary
+    write_summary(scan_path, severity_threshold, result.returncode != 0, output_format)
     
     return result.returncode
 
@@ -107,6 +110,57 @@ def set_output(name, value):
     else:
         # Fallback for local testing
         print(f"::set-output name={name}::{value}")
+
+def write_summary(scan_path, severity_threshold, issues_found, output_format):
+    """Write scan results to GitHub Actions summary."""
+    summary_file = os.environ.get('GITHUB_STEP_SUMMARY')
+    if not summary_file:
+        return
+    
+    with open(summary_file, 'a') as f:
+        f.write("## 🛡️ Trivy Security Scan Results\n\n")
+        f.write(f"**Scanned Path:** `{scan_path}`\n\n")
+        f.write(f"**Severity Filter:** `{severity_threshold}`\n\n")
+        
+        if issues_found:
+            f.write("### ❌ Security Issues Found!\n\n")
+            f.write("Run Trivy locally to see detailed results:\n")
+            f.write("```bash\n")
+            f.write(f"trivy config {scan_path} --severity {severity_threshold}\n")
+            f.write("```\n\n")
+            
+            # If we have a results file, try to parse and display it
+            output_file = os.environ.get("INPUT_OUTPUT-FILE", "")
+            if output_file and Path(output_file).exists() and output_format == "json":
+                try:
+                    with open(output_file, 'r') as rf:
+                        results = json.load(rf)
+                        
+                    f.write("### Top Security Issues:\n\n")
+                    f.write("| Severity | Type | Title | Resource |\n")
+                    f.write("|----------|------|-------|----------|\n")
+                    
+                    issue_count = 0
+                    for result in results.get('Results', []):
+                        for misconfig in result.get('Misconfigurations', []):
+                            if issue_count >= 10:  # Limit to top 10
+                                break
+                            severity = misconfig.get('Severity', 'UNKNOWN')
+                            title = misconfig.get('Title', 'N/A')
+                            type_ = misconfig.get('Type', 'N/A')
+                            resource = misconfig.get('CauseMetadata', {}).get('Resource', 'N/A')
+                            
+                            f.write(f"| {severity} | {type_} | {title[:50]}... | `{resource}` |\n")
+                            issue_count += 1
+                    
+                    if issue_count >= 10:
+                        f.write("\n*Showing first 10 issues. Run scan locally for complete results.*\n")
+                        
+                except Exception as e:
+                    f.write(f"\n*Could not parse detailed results: {e}*\n")
+        else:
+            f.write("### ✅ No Security Issues Found!\n\n")
+            f.write("All Terraform configurations passed the security scan.\n")
 
 def main():
     # Get inputs from environment variables
