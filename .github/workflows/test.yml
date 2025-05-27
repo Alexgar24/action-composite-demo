@@ -28,7 +28,7 @@ jobs:
           
       - name: Upload Scan Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: secure-scan-results
           path: secure-scan-results.json
@@ -54,7 +54,7 @@ jobs:
           
       - name: Upload Scan Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: insecure-scan-results
           path: insecure-scan-results.json
@@ -99,7 +99,7 @@ jobs:
           
       - name: Upload Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.format }}
           path: results.${{ matrix.format }}
