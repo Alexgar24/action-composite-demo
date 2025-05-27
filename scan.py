@@ -100,6 +100,10 @@ def scan_terraform(directory, severity_threshold, exit_code, output_format):
     
     print("=" * 60)
 
+    # Create GitHub annotations if we have JSON output
+    if output_file_path and output_file_path.exists() and output_format == "json":
+        create_github_annotations(output_file_path, scan_path)
+
     # Write to summary (pass the actual file path)
     write_summary(scan_path, severity_threshold, result.returncode != 0, output_format, output_file_path)
     
@@ -169,6 +173,66 @@ def write_summary(scan_path, severity_threshold, issues_found, output_format, ou
         else:
             f.write("### ✅ No Security Issues Found!\n\n")
             f.write("All Terraform configurations passed the security scan.\n")
+
+def create_github_annotations(output_file_path, scan_path):
+    """Create GitHub annotations for each security issue found."""
+    try:
+        with open(output_file_path, 'r') as f:
+            results = json.load(f)
+        
+        annotation_count = 0
+        max_annotations = 50  # GitHub has a limit
+        
+        for result in results.get('Results', []):
+            target_file = result.get('Target', '')
+            
+            for misconfig in result.get('Misconfigurations', []):
+                if annotation_count >= max_annotations:
+                    print(f"::warning::Reached annotation limit ({max_annotations}). Additional issues not shown as annotations.")
+                    return
+                
+                severity = misconfig.get('Severity', 'UNKNOWN')
+                title = misconfig.get('Title', 'Security Issue')
+                message = misconfig.get('Message', '')
+                resolution = misconfig.get('Resolution', '')
+                
+                # Get file location
+                cause_metadata = misconfig.get('CauseMetadata', {})
+                start_line = cause_metadata.get('StartLine', 1)
+                end_line = cause_metadata.get('EndLine', start_line)
+                
+                # Construct the file path relative to repository root
+                if target_file.startswith(str(scan_path)):
+                    # Remove the scan_path prefix to get relative path
+                    rel_path = os.path.relpath(target_file, scan_path)
+                else:
+                    rel_path = target_file
+                
+                # Create annotation message
+                annotation_msg = f"{title}"
+                if message:
+                    annotation_msg += f": {message}"
+                if resolution:
+                    annotation_msg += f" | Fix: {resolution}"
+                
+                # Map severity to annotation level
+                if severity in ['CRITICAL', 'HIGH']:
+                    annotation_type = "error"
+                elif severity == 'MEDIUM':
+                    annotation_type = "warning"
+                else:
+                    annotation_type = "notice"
+                
+                # Output GitHub annotation
+                if start_line and end_line:
+                    print(f"::{annotation_type} file={rel_path},line={start_line},endLine={end_line},title={severity} - {title}::{annotation_msg}")
+                else:
+                    print(f"::{annotation_type} file={rel_path},title={severity} - {title}::{annotation_msg}")
+                
+                annotation_count += 1
+                
+    except Exception as e:
+        print(f"::warning::Could not create GitHub annotations: {e}")
 
 def main():
     # Get inputs from environment variables
