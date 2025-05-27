@@ -1,0 +1,11 @@
+name: 'Hello World Docker Action'
+description: 'A simple Docker action that runs a Python script'
+author: 'Your Name'
+
+branding:
+  icon: 'terminal'
+  color: 'blue'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

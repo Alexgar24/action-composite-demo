@@ -1,4 +1,4 @@
-name: Test Composite Action
+name: Test Docker Action
 
 on:
   push:
@@ -8,12 +8,27 @@ on:
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
-  test-action:
+  test-local-action:
+    name: Test Local Docker Action
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Run Hello World Action
-        uses: ./action-demo
+      - name: Run Docker Action
+        uses: ./
+        
+  test-on-multiple-runners:
+    name: Test on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-22.04, ubuntu-20.04]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Run Docker Action on ${{ matrix.os }}
+        uses: ./
