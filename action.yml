@@ -8,4 +8,4 @@ branding:
 
 runs:
   using: 'docker'
-  image: 'docker://ghcr.io/Alexgar24/action-docker-demo:v1'
+  image: 'docker://ghcr.io/alexgar24/action-docker-demo:main'
