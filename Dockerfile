@@ -1,14 +1,24 @@
-# Use official Python runtime as base image
-FROM python:3.11-slim
+# Use Alpine for smaller image size
+FROM alpine:3.19
 
-# Set working directory in container
+# Install Python and required packages
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    curl \
+    git
+
+# Install Trivy
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.3
+
+# Set working directory
 WORKDIR /app
 
-# Copy the Python script into the container
-COPY hello.py /app/hello.py
+# Copy the scanner script
+COPY scan.py /app/scan.py
 
-# Make sure the script is executable
-RUN chmod +x /app/hello.py
+# Make script executable
+RUN chmod +x /app/scan.py
 
-# Set the entrypoint to run the Python script
-ENTRYPOINT ["python", "/app/hello.py"]
+# Set the entrypoint
+ENTRYPOINT ["python3", "/app/scan.py"]
